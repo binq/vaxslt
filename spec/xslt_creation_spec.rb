@@ -4,8 +4,9 @@ describe "XSLT Creation" do
   #This parser can parse VanStash scripts
   parser = lambda do
     root = Pathname(__FILE__).realpath.dirname + ".."
-    template = [(root + "lib/json2.js").read, 
-                (root + "vendor/pegjs/lib/compiler.js").read, 
+    template = [(root + "lib/md5.js").read, 
+                (root + "lib/json2.js").read,
+                (root + "vendor/pegjs/lib/compiler.js").read,
                 (root + "vendor/pegjs/lib/metagrammar.js").read,
                 "VanStash = PEG.buildParser(%s);" % [(root + "lib/grammar.peg").read.to_json]].join("\n\n")
 
@@ -31,14 +32,61 @@ describe "XSLT Creation" do
 
     result = YAML::load(<<-EOM)
     |
-      {"tag":"html","indent":""}
-      {"tag":"head","indent":"  "}
-      {"tag":"body","indent":"  "}
-      {"tag":"div","text":"Hello World","indent":"    "}
-      ""
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <div>
+            Hello World
+          </div>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
     EOM
 
-    parser.call(src).should == result.strip
+    parser.call(src).should == result
+  end
+
+  it "should compile when a tag indented three up finishes" do
+    src = YAML::load(<<-EOM)
+    |
+      %html
+        %head
+        %body
+          #one
+            #two
+              #three
+          #four
+    EOM
+
+    result = YAML::load(<<-EOM)
+    |
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <div id="one">
+            <div id="two">
+              <div id="three">
+              </div>
+            </div>
+          </div>
+          <div id="four">
+          </div>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
+    EOM
+
+    parser.call(src).should == result
   end
 
   it "should compile when a tag is defined using the shortcut with id" do
@@ -50,7 +98,25 @@ describe "XSLT Creation" do
           #header Hello World
     EOM
 
-    src.should == src
+    result = YAML::load(<<-EOM)
+    |
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <div id="header">
+            Hello World
+          </div>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
+    EOM
+
+    parser.call(src).should == result
   end
 
   it "should compile when a tag is defined using the shortcut with class" do
@@ -59,10 +125,28 @@ describe "XSLT Creation" do
       %html
         %head
         %body
-          .header Hello World
+          .header-one.header-two Hello World
     EOM
 
-    src.should == src
+    result = YAML::load(<<-EOM)
+    |
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <div class="header-one header-two">
+            Hello World
+          </div>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
+    EOM
+
+    parser.call(src).should == result
   end
 
   it "should compile when there is a call to a selection" do
@@ -75,7 +159,28 @@ describe "XSLT Creation" do
             #header=@_
     EOM
 
+    result = YAML::load(<<-EOM)
+    |
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <xsl:for-each select="header">
+            <div id="header">
+              <xsl:value-of select="."/>
+            </div>
+          </xsl:for-each>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
+    EOM
+
     src.should == src
+    #parser.call(src).should == result
   end
 
   it "should compile when there is a call to a selection inline" do
@@ -87,7 +192,28 @@ describe "XSLT Creation" do
           @#header=@_
     EOM
 
+    result = YAML::load(<<-EOM)
+    |
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <xsl:for-each select="header">
+            <div id="header">
+              <xsl:value-of select="."/>
+            </div>
+          </xsl:for-each>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
+    EOM
+
     src.should == src
+    #parser.call(src).should == result
   end
 
   it "should compile when there is a call to handle a deselection" do
