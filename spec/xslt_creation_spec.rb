@@ -1,13 +1,12 @@
-%w(johnson yaml json).each { |i| require i }
+%w(rubygems johnson yaml json).each { |i| require i }
 
 describe "XSLT Creation" do
   #This parser can parse VanStash scripts
   parser = lambda do
     root = Pathname(__FILE__).realpath.dirname + ".."
-    template = [(root + "lib/md5.js").read, 
-                (root + "lib/json2.js").read,
-                (root + "vendor/pegjs/lib/compiler.js").read,
+    template = [(root + "vendor/pegjs/lib/compiler.js").read,
                 (root + "vendor/pegjs/lib/metagrammar.js").read,
+                (root + "lib/compiler.js").read,
                 "VanStash = PEG.buildParser(%s);" % [(root + "lib/grammar.peg").read.to_json]].join("\n\n")
 
     lambda { |van_stash|
@@ -156,7 +155,7 @@ describe "XSLT Creation" do
         %head
         %body
           @header
-            #header=@_
+            #header=_
     EOM
 
     result = YAML::load(<<-EOM)

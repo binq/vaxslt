@@ -1,142 +1,11 @@
 start
-  = lines:lines {
-    var compiler = (function() {
-      //The object that handles indentation for Parser
-      function Indent() {
-        this.unit = "";
-        this.current = "";
-        this.currentLevel = null;
-        this.previousLevel = null;
-      }
-
-      //Compiles the intermediate result from PEG.js into XSLT
-      function Compiler() {
-        this.lineNumber = 0;
-        this.resultHead = [];
-        this.resultTail = [];
-        this.indent = new Indent();
-        this.textTag = null;
-      }
-
-      //Won't do anything if this.unit has already been set to something besides "", otherwise will set it based on currentLevel
-      Indent.prototype.setUnit = function(currentLevel) {
-        //Nothing to do if this.unit has already been set or if there is no currentLevel
-        if (this.unit != "" || this.currentLevel == 0) return;
-
-        this.unit = "";
-        for(var i=0; i<this.currentLevel; i++) this.unit += " ";
-      }
-
-      //Sets the value for current based on currentLevel
-      Indent.prototype.adjustCurrent = function() {
-        //Returns decreased indent level, from previous.  Decreasing indentation should be in multiples of a unit
-        decreaseCurrent = function(previous) {
-          if ((this.previousLevel - this.currentLevel) % this.unit.length != 0) {
-            throw JSON.stringify({problem: "Misaligned indentation.",
-                                  functionName: "decreaseCurrent",
-                                  unitLength: this.unit.length,
-                                  currentLevel: this.currentLevel,
-                                  previousLevel: this.previousLevel})
-          }
-          return previous.substr(0, this.currentLevel);
-        }
-
-        //Returns increased indent level, from previous.  Increaasing indentation should only be one unit
-        increaseCurrent = function(previous) {
-          if ((this.currentLevel - this.previousLevel) != this.unit.length) {
-            throw JSON.stringify({problem: "Misaligned indentation.",
-                                  functionName: "increaseCurrent",
-                                  unitLength: this.unit.length,
-                                  currentLevel: this.currentLevel,
-                                  previousLevel: this.previousLevel})
-          }
-          return previous + this.unit;
-        }
-
-        this.current =
-          this.previousLevel > this.currentLevel ? decreaseCurrent.call(this, this.current) :
-          this.previousLevel < this.currentLevel ? increaseCurrent.call(this, this.current) :
-                                                   this.current; // Assuming this.previousLevel == this.currentLevel
-      }
-
-      //Updates the indent object with the currentLevel
-      Compiler.prototype.setIndent = function(currentLevel) {
-        var indent = this.indent;
-        currentLevel = typeof currentLevel == "number" ? currentLevel : 0;
-
-        indent.previousLevel = indent.currentLevel;
-        indent.currentLevel = currentLevel;
-        indent.setUnit();
-        indent.adjustCurrent();
-      }
-
-      Compiler.prototype.closeCompletedPreviousTag = function() {
-        while (this.indent.previousLevel >= this.indent.currentLevel && this.resultTail.length > 0) {
-          this.resultHead.push(this.resultTail.pop());
-          this.indent.previousLevel -= this.indent.unit.length;
-        }
-      }
-
-      Compiler.prototype.flushTextTag = function() {
-        if (!this.textTag) return;
-        if (this.previousLevel < this.currentLevel) throw "Can not have children and text";
-
-        this.resultHead.push(this.textTag);
-        this.textTag = null;
-      }
-
-      Compiler.prototype.storeTextTag = function(tagOpen, text, tagClose) {
-        this.textTag = [tagOpen, this.indent.current + this.indent.unit + text, tagClose].join("\n")
-      }
-
-      Compiler.prototype.eval = function(statement) {
-        //Ruby.puts(JSON.stringify(statement));
-
-        this.setIndent(statement.indent);
-        this.flushTextTag();
-        this.closeCompletedPreviousTag();
-
-        if (statement.referencing) {
-          var tagOpen = this.indent.current + '<xsl:for-each select="' + statement.referencing + '">';
-          var tagClose = this.indent.current + '</xsl:for-each>';
-          this.resultHead.push(tagOpen);
-          this.resultTail.push(tagClose);
-        }
-
-        if (statement.tag) {
-          var class_part = statement.classes ? ' class="' + statement.classes.join(' ') + '"' : "";
-          var id_part = statement.id ? ' id="' + statement.id + '"' : "";
-          var tagOpen = this.indent.current + "<" + statement.tag + id_part + class_part + ">";
-          var tagClose = this.indent.current + "</" + statement.tag + ">";
-
-          if (typeof statement.text == "string") {
-            this.storeTextTag(tagOpen, statement.text, tagClose);
-          } else {
-            this.resultHead.push(tagOpen);
-            this.resultTail.push(tagClose);
-          }
-        } else {
-        }
-      }
-
-      Compiler.prototype.result = function() {
-        wrapHead = ['<?xml version="1.0" encoding="ISO-8859-1"?>',
-                    '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">',
-                    '<xsl:template match="/data">']
-        wrapTail = ["</xsl:template>", "</xsl:stylesheet>"]
-
-        return [wrapHead.join("\n"), this.resultHead.join("\n"), wrapTail.join("\n")].join("\n") + "\n";
-      }
-
-      return new Compiler();
-    })()
+  = intermediate:intermediate_lines* last:line {
+    var lines = intermediate.concat(last);
+    var compiler = new Compiler();
 
     for(var i=0; i<lines.length; i++) { compiler.eval(lines[i]); }
     return compiler.result();
   }
-
-lines
-  = intermediate:intermediate_lines* last:line { return intermediate.concat(last); }
 
 intermediate_lines
   = line:line "\n" { return line; }
@@ -151,95 +20,132 @@ line
 
 bare_line
   = tag_line
-  / referencing
-  / dereferencing
-  / view_partial_line
   / replacement
   / text
 
 tag_line
-  = tag_labels:tag_labels predicate:tag_line_predicate {
-    var result = {};
-
-    result.tag = tag_labels.tag;
-    if (typeof tag_labels.id != "undefined") result.id = tag_labels.id;
-    if (typeof tag_labels.referencing != "undefined") result.referencing = tag_labels.referencing;
-    if (typeof tag_labels.dereferencing != "undefined") result.dereferencing = tag_labels.dereferencing;
-    if (typeof tag_labels.classes != "undefined") result.classes = tag_labels.classes;
-    if (typeof predicate != "undefined" && predicate.replacement != "undefined") { result.replacement = predicate.replacement; }
-    if (typeof predicate != "undefined" && predicate.text != "undefined") { result.text = predicate.text; }
-
-    return result;
+  = '>' predicate:.* {  //- predicate for locals
+    return {type: 'partial'};
   }
+  / '-' predicate:.* {  //- predicate for directive expression
+    return {type: 'directive'};
+  }
+  / statement:tag_statement predicate:tag_predicate {
+    var result = statement;
 
-tag_line_predicate
-  = replacement
-  / spaced_text
-  /
-
-tag_labels
-  = tag_labels:tag_label+  {
-    var result = {tag: "div"};
-
-    for(var i=0; i<tag_labels.length; i++) {
-      switch(tag_labels[i].type) {
-      case 'tag':
-        result.tag = tag_labels[i].label;
-        break;
-      case 'id':
-        result.id = tag_labels[i].label;
-        break;
-      case 'class':
-        if (typeof result.classes == "undefined") result.classes = [];
-        result.classes.push(tag_labels[i].label);
-        break;
-      case 'referencing-with-id':
-        result.id = tag_labels[i].label;
-        result.referencing = tag_labels[i].label;
-        break;
-      case 'dereferencing-with-id':
-        result.id = tag_labels[i].label;
-        result.dereferencing = tag_labels[i].label;
-        break;
-      default:
-        throw "Can't be";
-        break;
-      }
+    switch(predicate.type) {
+    case 'blank':
+      break;
+    case 'text':
+      result.text = predicate.content
+      break;
+    case 'replacement':
+      result.replacement = predicate.name;
+      break;
+    default:
+      throw "Unrecoverable: 93c26db0-2c27-012e-811c-0017f2ca58f7";
+      break;
     }
 
     return result;
   }
 
-tag_label
-  = '%'  token:token { return {type: 'tag',                   label: token}; }
-  / '#'  token:token { return {type: 'id',                    label: token}; }
-  / '.'  token:token { return {type: 'class',                 label: token}; }
+tag_statement
+  = clauses:tag_clause+ {
+    var result = {};
 
-spaced_text
-  = " "+ text:text { return text; }
+    /* Declaration types of id, class, js-section, or js-hook need to belong inside a tag, Whereas scoped and not_scoped do not. */
+    var tag_necessary = false;
+
+    var process = function(declaration, label) {
+      switch(declaration.type) {
+      case 'tag':
+        if (typeof result.tag == "undefined") result.tag = label;
+        break;
+      case 'id':
+        tag_necessary = true;
+        if (typeof result.id == "undefined") result.id = label;
+        break;
+      case 'class':
+        tag_necessary = true;
+        if (typeof result.classes == "undefined") result.classes = [];
+        result.classes.push(label);
+        break;
+      case 'js_section':
+        tag_necessary = true;
+        if (typeof result.classes == "undefined") result.classes = [];
+        result.classes.push("js-section");
+        result.classes.push(label + "-js");
+        break;
+      case 'js_hook':
+        tag_necessary = true;
+        if (typeof result.classes == "undefined") result.classes = [];
+        result.classes.push("js-hook");
+        result.classes.push(label + "-js");
+        break;
+      case 'scoped':
+        if (typeof result.scoped == "undefined") result.scoped = label;
+        break;
+      case 'not_scoped':
+        if (typeof result.not_scoped == "undefined") result.not_scoped = [];
+        result.not_scoped.push(label);
+        break;
+      default:
+        throw "Unrecoverable: 2e9d9e40-2a2d-012e-811b-0017f2ca58f7";
+        break;
+      }
+    }
+
+    for(var i=0; i<clauses.length; i++) {
+      for(var j=0; j<clauses[i].declarations.length; j++) {
+        process(clauses[i].declarations[j], clauses[i].label);
+      }
+    }
+
+    if (tag_necessary == true && typeof result.tag == "undefined") result.tag = "div";
+
+    return result;
+  }
+
+tag_clause
+  = declarations:tag_declaration+ label:token {
+    return {declarations: declarations, label: label};
+  }
+
+tag_declaration
+  = '%' { return {type: 'tag'}; }        //- tag_dec_generic
+  / '#' { return {type: 'id'}; }         //- tag_dec_id
+  / '.' { return {type: 'class'}; }      //- tag_dec_class
+  / '*' { return {type: 'js_section'}; } //- tag_dec_js_section
+  / '+' { return {type: 'js_hook'}; }    //- tag_dec_js_hook
+  / '@' { return {type: 'scoped'}; }     //- tag_dec_scoped
+  / '^' { return {type: 'not_scoped'}; } //- tag_dec_not_scoped
+
+tag_predicate
+  = replacement
+  / " "+ text:text {
+    return {type: "text", content: text.content};
+  }
+  / {
+    return {type: "blank"};
+  }
 
 replacement
-  = '=' spaces token:token { return {replacement: token}; }
-  / '=' spaces "@_"        { return {valueReplacement: true}; }
-
-referencing
-  = '@' spaces token:token { return {referencing: token}; }
-
-dereferencing
-  = '^' spaces token:token { return {dereferencing: token}; }
-
-view_partial_line
-  = '>' spaces token:token { return {partial: token}; }
+  = '=' spaces token:token {
+    return {type: "replacement", name: token};
+  }
+  / '=' spaces '_' {
+    return {type: "replacement", name: '_'};
+  }
 
 text
-  = text:[^\n]+ { return {text: text.join('')}; }
+  = text:[^\n]+ { return {content: text.join('')}; }
 
 indent
-  = spaces:spaces { return spaces.join(''); }
+  = spaces
 
 spaces
-  = [ ]*
+  = spaces:[ ]* { return spaces.join(''); }
 
 token
   = token_head:[a-zA-Z] token_rest:[a-zA-Z0-9:_-]* { return token_head + token_rest.join(''); }
-  / '_' { return '_'; }
