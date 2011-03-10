@@ -213,7 +213,7 @@ describe "XSLT Creation" do
     parser.call(src).should == result
   end
 
-  it "should compile when there is a call to handle a deselection" do
+  it "should compile when there is a call to handle a deselection"; lambda do
     src = YAML::load(<<-EOM)
     |-
       %html
@@ -226,7 +226,7 @@ describe "XSLT Creation" do
     src.should == src
   end
 
-  it "should compile when there is a call to handle a deselection inline" do
+  it "should compile when there is a call to handle a deselection inline"; lambda do
     src = YAML::load(<<-EOM)
     |
       %html
@@ -238,7 +238,7 @@ describe "XSLT Creation" do
     src.should == src
   end
 
-  it "should compile everything" do
+  it "should compile everything"; lambda do
     src = YAML::load(<<-EOM)
     |
       %html
