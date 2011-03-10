@@ -113,17 +113,17 @@ tag_clause
   }
 
 tag_declaration
-  = '%' { return {type: 'tag'}; }        //- tag_dec_generic
-  / '#' { return {type: 'id'}; }         //- tag_dec_id
-  / '.' { return {type: 'class'}; }      //- tag_dec_class
-  / '*' { return {type: 'js_section'}; } //- tag_dec_js_section
-  / '+' { return {type: 'js_hook'}; }    //- tag_dec_js_hook
-  / '@' { return {type: 'scoped'}; }     //- tag_dec_scoped
-  / '^' { return {type: 'not_scoped'}; } //- tag_dec_not_scoped
+  = '%' { return {type: 'tag'}; }
+  / '#' { return {type: 'id'}; }
+  / '.' { return {type: 'class'}; }
+  / '*' { return {type: 'js_section'}; }
+  / '+' { return {type: 'js_hook'}; }
+  / '@' { return {type: 'scoped'}; }
+  / '^' { return {type: 'not_scoped'}; }
 
 tag_predicate
   = replacement
-  / " "+ text:text {
+  / [ ]+ text:text {
     return {type: "text", content: text.content};
   }
   / {
@@ -131,21 +131,21 @@ tag_predicate
   }
 
 replacement
-  = '=' spaces token:token {
-    return {type: "replacement", name: token};
-  }
-  / '=' spaces '_' {
+  = '=' [ ]* '_' {
     return {type: "replacement", name: '_'};
+  }
+  / '=' [ ]* payload:non_spaces {
+    return {type: "replacement", name: payload};
   }
 
 text
   = text:[^\n]+ { return {content: text.join('')}; }
 
 indent
-  = spaces
+  = [ ]*
 
-spaces
-  = spaces:[ ]* { return spaces.join(''); }
+non_spaces
+  = text:[^\s]+ { return text.join(''); }
 
 token
   = token_head:[a-zA-Z] token_rest:[a-zA-Z0-9:_-]* { return token_head + token_rest.join(''); }
