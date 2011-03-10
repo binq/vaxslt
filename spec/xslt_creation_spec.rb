@@ -187,7 +187,7 @@ describe "XSLT Creation" do
       %html
         %head
         %body
-          @#header=@_
+          @#header= _
     EOM
 
     result = YAML::load(<<-EOM)
@@ -200,9 +200,9 @@ describe "XSLT Creation" do
         </head>
         <body>
           <xsl:for-each select="header">
-            <div id="header">
-              <xsl:value-of select="."/>
-            </div>
+          <div id="header">
+            <xsl:value-of select="." />
+          </div>
           </xsl:for-each>
         </body>
       </html>
@@ -210,8 +210,7 @@ describe "XSLT Creation" do
       </xsl:stylesheet>
     EOM
 
-    src.should == src
-    #parser.call(src).should == result
+    parser.call(src).should == result
   end
 
   it "should compile when there is a call to handle a deselection" do
