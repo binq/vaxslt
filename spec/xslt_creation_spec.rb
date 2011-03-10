@@ -169,7 +169,7 @@ describe "XSLT Creation" do
         <body>
           <xsl:for-each select="header">
             <div id="header">
-              <xsl:value-of select="."/>
+              <xsl:value-of select="." />
             </div>
           </xsl:for-each>
         </body>
@@ -178,8 +178,7 @@ describe "XSLT Creation" do
       </xsl:stylesheet>
     EOM
 
-    src.should == src
-    #parser.call(src).should == result
+    parser.call(src).should == result
   end
 
   it "should compile when there is a call to a selection inline" do
