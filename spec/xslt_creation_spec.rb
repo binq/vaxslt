@@ -213,6 +213,45 @@ describe "XSLT Creation" do
     parser.call(src).should == result
   end
 
+  it "should compile when there is a call to a selection inline with child nodes" do
+    src = YAML::load(<<-EOM)
+    |
+      %html
+        %head
+        %body
+          @#header
+            .one One
+            .two Two
+    EOM
+
+    result = YAML::load(<<-EOM)
+    |
+      <?xml version="1.0" encoding="ISO-8859-1"?>
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+      <xsl:template match="/data">
+      <html>
+        <head>
+        </head>
+        <body>
+          <xsl:for-each select="header">
+          <div id="header">
+            <div class="one">
+              One
+            </div>
+            <div class="two">
+              Two
+            </div>
+          </div>
+          </xsl:for-each>
+        </body>
+      </html>
+      </xsl:template>
+      </xsl:stylesheet>
+    EOM
+
+    parser.call(src).should == result
+  end
+
   it "should compile when there is a call to handle a deselection"; lambda do
     src = YAML::load(<<-EOM)
     |-
