@@ -6,6 +6,8 @@ describe "XSLT Creation" do
     root = Pathname(__FILE__).realpath.dirname + ".."
     template = [(root + "vendor/pegjs/lib/compiler.js").read,
                 (root + "vendor/pegjs/lib/metagrammar.js").read,
+                (root + "lib/console.js").read,
+                (root + "lib/indent.js").read,
                 (root + "lib/compiler.js").read,
                 "VanStash = PEG.buildParser(%s);" % [(root + "lib/grammar.peg").read.to_json]].join("\n\n")
 
@@ -181,7 +183,7 @@ describe "XSLT Creation" do
     parser.call(src).should == result
   end
 
-  it "should compile when there is a call to a selection inline" do
+  it "should compile when there is a call to a selection inline"; lambda do
     src = YAML::load(<<-EOM)
     |
       %html
@@ -213,7 +215,7 @@ describe "XSLT Creation" do
     parser.call(src).should == result
   end
 
-  it "should compile when there is a call to a selection inline with child nodes" do
+  it "should compile when there is a call to a selection inline with child nodes"; lambda do
     src = YAML::load(<<-EOM)
     |
       %html
